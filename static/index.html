@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>STCKRSLAP</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
+
+    <div id="hud">
+        <div id="connection-status">Connecting...</div>
+        <div id="scrape-cooldown" hidden></div>
+    </div>
+
+    <div id="toolbar">
+        <button id="scrape-toggle" title="Toggle scrape mode (S)">Scrape</button>
+    </div>
+
+    <script src="/static/js/input.js"></script>
+    <script src="/static/js/canvas.js"></script>
+    <script src="/static/js/websocket.js"></script>
+    <script src="/static/js/sticker.js"></script>
+    <script src="/static/js/scrape.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

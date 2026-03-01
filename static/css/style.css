@@ -1,0 +1,134 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #1a1a1a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+#canvas.panning {
+    cursor: grabbing;
+}
+
+#canvas.scrape-mode {
+    cursor: crosshair;
+}
+
+#canvas.placing {
+    cursor: none;
+}
+
+#canvas.dragging-sticker {
+    cursor: copy;
+}
+
+#hud {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 100;
+}
+
+#connection-status {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+#connection-status.connected {
+    background: rgba(34, 139, 34, 0.7);
+}
+
+#connection-status.disconnected {
+    background: rgba(178, 34, 34, 0.7);
+}
+
+#scrape-cooldown {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+#toolbar {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+}
+
+#scrape-toggle {
+    padding: 8px 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+#scrape-toggle:hover {
+    background: rgba(0, 0, 0, 0.8);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+#scrape-toggle.active {
+    background: rgba(178, 34, 34, 0.8);
+    border-color: rgba(255, 100, 100, 0.7);
+}
+
+#toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 12px 24px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 200;
+    pointer-events: none;
+}
+
+/* Drop zone visual feedback */
+body.drag-over #canvas {
+    outline: 3px dashed rgba(255, 255, 255, 0.5);
+    outline-offset: -3px;
+}
