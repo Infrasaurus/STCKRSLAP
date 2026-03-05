@@ -1,23 +1,19 @@
-// Sticker upload, placement, and rotation
+// Sticker upload, tray, and placement
 //
 // Flow:
-//   1. User drops image file → upload to server
+//   1. User uploads or drops image file -> upload to server
 //   2. Server returns {id, imageData, width, height}
-//   3. Client preloads image, enters PLACEMENT mode (sticker follows cursor)
-//   4. User clicks to place → sends WS "place", enters ROTATION mode
-//   5. User click-and-holds to rotate → live preview
-//   6. User releases → sends WS "finalize", sticker is locked
-//   7. 60s timeout auto-finalizes if user doesn't rotate
+//   3. Sticker appears in tray at bottom of screen
+//   4. User drags sticker from tray onto canvas
+//   5. On release, sticker is placed with random wobble (+-30 deg) and immediately finalized
 
 // Interaction state machine
 const MODE_NONE = 0;
-const MODE_PLACING = 1;   // ghost sticker follows cursor
-const MODE_ROTATING = 2;  // click-and-hold to rotate a placed sticker
+const MODE_PLACING = 1;   // ghost sticker follows cursor (dragging from tray)
 
 let interactionMode = MODE_NONE;
-let ghostSticker = null;     // {id, image, canvas, width, height} — follows cursor
+let ghostSticker = null;     // {id, image, canvas, width, height, trayItem} — follows cursor
 let ghostScreenPos = null;   // {x, y} — current screen position of ghost
-let rotatingSticker = null;  // sticker being rotated
 
 function initStickerDrop(app) {
     const el = app.renderer.el;
@@ -50,12 +46,11 @@ function initStickerDrop(app) {
         if (!files || files.length === 0) return;
 
         const file = files[0];
-        if (!file.type.match(/^image\/(png|jpeg|webp)$/)) {
+        if (!file.type.match(/^image\/(png|jpeg|webp|gif)$/)) {
             showToast('Unsupported file type', 2000);
             return;
         }
 
-        ghostScreenPos = { x: e.clientX, y: e.clientY };
         uploadSticker(app, file);
     });
 
@@ -66,43 +61,24 @@ function initStickerDrop(app) {
     // Click/drag interaction
     let isPanning = false;
     let panLast = null;
-    let rotDragStarted = false;
 
     app.input.onDragStart = (x, y, e) => {
-        // PLACEMENT mode: click to place the ghost sticker
+        // PLACEMENT mode: start dragging the ghost to position it
         if (interactionMode === MODE_PLACING && ghostSticker) {
-            placeGhostSticker(app, x, y);
+            ghostScreenPos = { x, y };
+            app.renderer.markDirty();
             return;
         }
 
-        // Check if clicking on a sticker awaiting rotation
-        const canvasPos = app.renderer.screenToCanvas(x, y);
-        const unfinalizedHit = findUnfinalizedStickerAt(app, canvasPos.x, canvasPos.y);
-
-        if (unfinalizedHit) {
-            interactionMode = MODE_ROTATING;
-            rotatingSticker = unfinalizedHit;
-            rotDragStarted = false;
-            return;
-        }
-
-        if (app.scrapeMode) {
-            startScrape(app, x, y);
-        } else {
-            isPanning = true;
-            panLast = { x, y };
-            app.renderer.el.classList.add('panning');
-        }
+        isPanning = true;
+        panLast = { x, y };
+        app.renderer.el.classList.add('panning');
     };
 
     app.input.onDragMove = (x, y, e) => {
-        if (interactionMode === MODE_ROTATING && rotatingSticker) {
-            rotDragStarted = true;
-            const canvasPos = app.renderer.screenToCanvas(x, y);
-            const cx = rotatingSticker.x + rotatingSticker.width / 2;
-            const cy = rotatingSticker.y + rotatingSticker.height / 2;
-            rotatingSticker.rotation = Math.atan2(canvasPos.y - cy, canvasPos.x - cx);
-            buildStickerCanvas(rotatingSticker);
+        // PLACEMENT mode: move ghost with finger/mouse
+        if (interactionMode === MODE_PLACING && ghostSticker) {
+            ghostScreenPos = { x, y };
             app.renderer.markDirty();
             return;
         }
@@ -112,24 +88,13 @@ function initStickerDrop(app) {
             const dy = y - panLast.y;
             panLast = { x, y };
             app.renderer.pan(dx, dy);
-            return;
-        }
-
-        if (app.scrapeMode) {
-            continueScrape(app, x, y);
         }
     };
 
     app.input.onDragEnd = (x, y, e) => {
-        if (interactionMode === MODE_ROTATING && rotatingSticker) {
-            // Finalize rotation (even if they didn't drag — finalizes at current angle)
-            app.socket.send({
-                type: 'finalize',
-                id: rotatingSticker.id,
-                rotation: rotatingSticker.rotation,
-            });
-            rotatingSticker = null;
-            interactionMode = MODE_NONE;
+        // PLACEMENT mode: release to place
+        if (interactionMode === MODE_PLACING && ghostSticker) {
+            placeGhostSticker(app, x, y);
             return;
         }
 
@@ -137,11 +102,6 @@ function initStickerDrop(app) {
             isPanning = false;
             panLast = null;
             app.renderer.el.classList.remove('panning');
-            return;
-        }
-
-        if (app.scrapeMode) {
-            endScrape(app, x, y);
         }
     };
 
@@ -156,17 +116,134 @@ function initStickerDrop(app) {
         app.renderer.pan(dx, dy);
     };
 
-    // ESC cancels placement mode
+    // Pinch-to-zoom (touch)
+    app.input.onPinchZoom = (scale, screenX, screenY) => {
+        app.renderer.pinchZoom(scale, screenX, screenY);
+    };
+
+    // ESC cancels placement mode — return sticker to tray
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && interactionMode === MODE_PLACING) {
             cancelPlacement(app);
         }
     });
+
+    // Document-level mousemove/touchmove for ghost tracking during tray drag
+    document.addEventListener('mousemove', (e) => {
+        if (interactionMode === MODE_PLACING && ghostSticker) {
+            ghostScreenPos = { x: e.clientX, y: e.clientY };
+            app.renderer.markDirty();
+        }
+    });
+    document.addEventListener('touchmove', (e) => {
+        if (interactionMode === MODE_PLACING && ghostSticker) {
+            const t = e.touches[0];
+            ghostScreenPos = { x: t.clientX, y: t.clientY };
+            app.renderer.markDirty();
+        }
+    }, { passive: true });
+
+    // Document-level mouseup/touchend to place from tray drag
+    document.addEventListener('mouseup', (e) => {
+        if (interactionMode === MODE_PLACING && ghostSticker) {
+            placeGhostSticker(app, e.clientX, e.clientY);
+        }
+    });
+    document.addEventListener('touchend', (e) => {
+        if (interactionMode === MODE_PLACING && ghostSticker && ghostScreenPos) {
+            placeGhostSticker(app, ghostScreenPos.x, ghostScreenPos.y);
+        }
+    });
+}
+
+function addToTray(app, data) {
+    const tray = document.getElementById('sticker-tray');
+    const img = new Image();
+    img.onload = () => {
+        const isGif = (data.mimeType === 'image/gif');
+        let offscreen;
+        if (isGif) {
+            // For GIFs, use the <img> directly so animation is preserved
+            offscreen = img;
+        } else {
+            offscreen = document.createElement('canvas');
+            offscreen.width = data.width;
+            offscreen.height = data.height;
+            const octx = offscreen.getContext('2d');
+            octx.drawImage(img, 0, 0);
+        }
+
+        const thumbEl = document.createElement('img');
+        thumbEl.className = 'tray-sticker';
+        thumbEl.src = img.src;
+        thumbEl.draggable = false;
+
+        const trayItem = {
+            id: data.id,
+            image: img,
+            canvas: offscreen,
+            width: data.width,
+            height: data.height,
+            gif: isGif,
+            el: thumbEl,
+        };
+
+        app.tray.push(trayItem);
+        tray.appendChild(thumbEl);
+
+        // Start drag from tray on mousedown/touchstart
+        const startDrag = (startX, startY) => {
+            // Remove from tray
+            const idx = app.tray.indexOf(trayItem);
+            if (idx !== -1) app.tray.splice(idx, 1);
+            thumbEl.remove();
+
+            // Enter placement mode
+            ghostSticker = {
+                id: trayItem.id,
+                image: trayItem.image,
+                canvas: trayItem.canvas,
+                width: trayItem.width,
+                height: trayItem.height,
+                gif: trayItem.gif,
+                trayItem: trayItem,
+            };
+            ghostScreenPos = { x: startX, y: startY };
+            interactionMode = MODE_PLACING;
+            app.renderer.el.classList.add('placing');
+            app.renderer.markDirty();
+        };
+
+        thumbEl.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startDrag(e.clientX, e.clientY);
+        });
+        thumbEl.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const t = e.touches[0];
+            startDrag(t.clientX, t.clientY);
+        });
+    };
+    img.onerror = () => {
+        showToast('Failed to load sticker image', 3000);
+    };
+    const mime = data.mimeType || 'image/png';
+    img.src = 'data:' + mime + ';base64,' + data.imageData;
+}
+
+function returnToTray(app, ghost) {
+    if (!ghost || !ghost.trayItem) return;
+    const tray = document.getElementById('sticker-tray');
+    app.tray.push(ghost.trayItem);
+    tray.appendChild(ghost.trayItem.el);
 }
 
 function uploadSticker(app, file) {
-    // Don't allow new upload while placing
-    if (interactionMode === MODE_PLACING) return;
+    // Don't allow upload before state is synced
+    if (!app.socket._ready) {
+        showToast('Syncing canvas, please wait...', 2000);
+        return;
+    }
 
     const formData = new FormData();
     formData.append('sticker', file);
@@ -183,36 +260,11 @@ function uploadSticker(app, file) {
         })
         .then(data => {
             if (data.resized) {
-                showToast('Sticker resized — click to place', 2000);
+                showToast('Sticker added to tray (resized)', 2000);
             } else {
-                showToast('Click to place sticker', 2000);
+                showToast('Sticker added to tray', 2000);
             }
-
-            // Preload the image, then enter placement mode
-            const img = new Image();
-            img.onload = () => {
-                const offscreen = document.createElement('canvas');
-                offscreen.width = data.width;
-                offscreen.height = data.height;
-                const octx = offscreen.getContext('2d');
-                octx.drawImage(img, 0, 0);
-
-                ghostSticker = {
-                    id: data.id,
-                    image: img,
-                    canvas: offscreen,
-                    width: data.width,
-                    height: data.height,
-                };
-
-                interactionMode = MODE_PLACING;
-                app.renderer.el.classList.add('placing');
-                app.renderer.markDirty();
-            };
-            img.onerror = () => {
-                showToast('Failed to load sticker image', 3000);
-            };
-            img.src = 'data:image/png;base64,' + data.imageData;
+            addToTray(app, data);
         })
         .catch(err => {
             showToast('Upload failed: ' + err.message, 3000);
@@ -226,16 +278,24 @@ function placeGhostSticker(app, screenX, screenY) {
     const placeX = ((Math.round(canvasPos.x) - Math.floor(ghostSticker.width / 2)) % CANVAS_W + CANVAS_W) % CANVAS_W;
     const placeY = Math.max(0, Math.round(canvasPos.y) - Math.floor(ghostSticker.height / 2));
 
+    // Random wobble: +-30 degrees
+    const rotation = (Math.random() * 60 - 30) * Math.PI / 180;
+
     // Add locally immediately so it renders without waiting for broadcast
     addStickerLocally(app, ghostSticker.id, ghostSticker.image,
-        ghostSticker.width, ghostSticker.height, placeX, placeY);
+        ghostSticker.width, ghostSticker.height, placeX, placeY, rotation, true, ghostSticker.gif);
 
-    // Tell server
+    // Tell server — place and immediately finalize
     app.socket.send({
         type: 'place',
         id: ghostSticker.id,
         x: placeX,
         y: placeY,
+    });
+    app.socket.send({
+        type: 'finalize',
+        id: ghostSticker.id,
+        rotation: rotation,
     });
 
     // Exit placement mode
@@ -243,11 +303,11 @@ function placeGhostSticker(app, screenX, screenY) {
     ghostScreenPos = null;
     interactionMode = MODE_NONE;
     app.renderer.el.classList.remove('placing');
-
-    showToast('Click and drag sticker to rotate, or click to lock', 3000);
 }
 
 function cancelPlacement(app) {
+    // Return sticker to tray instead of discarding
+    returnToTray(app, ghostSticker);
     ghostSticker = null;
     ghostScreenPos = null;
     interactionMode = MODE_NONE;
@@ -275,21 +335,6 @@ function renderGhostSticker(ctx, renderer) {
     ctx.strokeRect(screenX, screenY, ghostSticker.width * z, ghostSticker.height * z);
     ctx.setLineDash([]);
     ctx.restore();
-}
-
-function findUnfinalizedStickerAt(app, cx, cy) {
-    const arr = Array.from(app.stickers.values());
-    for (let i = arr.length - 1; i >= 0; i--) {
-        const s = arr[i];
-        if (s.finalized) continue;
-        if (cx >= s.x && cx <= s.x + s.width && cy >= s.y && cy <= s.y + s.height) {
-            return s;
-        }
-        // Check wrapped positions
-        if (cx + CANVAS_W >= s.x && cx + CANVAS_W <= s.x + s.width) return s;
-        if (cx - CANVAS_W >= s.x && cx - CANVAS_W <= s.x + s.width) return s;
-    }
-    return null;
 }
 
 function showToast(message, autoDismissMs) {

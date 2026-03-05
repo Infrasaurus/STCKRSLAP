@@ -8,7 +8,7 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #1a1a1a;
+    background: #141414;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     touch-action: none;
     -webkit-user-select: none;
@@ -26,16 +26,31 @@ html, body {
     cursor: grabbing;
 }
 
-#canvas.scrape-mode {
-    cursor: crosshair;
-}
-
 #canvas.placing {
     cursor: none;
 }
 
 #canvas.dragging-sticker {
     cursor: copy;
+}
+
+#gif-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#gif-overlay img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    will-change: transform;
 }
 
 #hud {
@@ -66,18 +81,22 @@ html, body {
     background: rgba(34, 139, 34, 0.7);
 }
 
-#connection-status.disconnected {
-    background: rgba(178, 34, 34, 0.7);
-}
-
-#scrape-cooldown {
+#last-sticker {
     padding: 4px 10px;
     border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.6);
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
+}
+
+#last-sticker:empty {
+    display: none;
+}
+
+#connection-status.disconnected {
+    background: rgba(178, 34, 34, 0.7);
 }
 
 #toolbar {
@@ -86,9 +105,11 @@ html, body {
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
+    display: flex;
+    gap: 8px;
 }
 
-#scrape-toggle {
+#toolbar button {
     padding: 8px 20px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 20px;
@@ -99,32 +120,85 @@ html, body {
     font-weight: 600;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
 }
 
-#scrape-toggle:hover {
+#toolbar button:hover {
     background: rgba(0, 0, 0, 0.8);
     border-color: rgba(255, 255, 255, 0.5);
 }
 
-#scrape-toggle.active {
-    background: rgba(178, 34, 34, 0.8);
-    border-color: rgba(255, 100, 100, 0.7);
+#toolbar button:active {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+#upload-btn {
+    background: rgba(34, 100, 34, 0.6);
+    border-color: rgba(100, 200, 100, 0.4);
+}
+
+#upload-btn:hover {
+    background: rgba(34, 100, 34, 0.8);
+    border-color: rgba(100, 200, 100, 0.6);
 }
 
 #toast {
     position: fixed;
-    top: 50%;
+    top: 48px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    padding: 12px 24px;
+    transform: translateX(-50%);
+    padding: 10px 20px;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(4px);
     color: #fff;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     z-index: 200;
     pointer-events: none;
+    max-width: 90vw;
+    text-align: center;
+}
+
+#sticker-tray {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99;
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    max-width: 90vw;
+    overflow-x: auto;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+#sticker-tray:empty {
+    display: none;
+}
+
+.tray-sticker {
+    height: 64px;
+    width: auto;
+    border-radius: 6px;
+    cursor: grab;
+    transition: transform 0.12s;
+    flex-shrink: 0;
+    -webkit-user-drag: none;
+    user-select: none;
+    touch-action: none;
+}
+
+.tray-sticker:hover {
+    transform: scale(1.1);
+}
+
+.tray-sticker:active {
+    cursor: grabbing;
 }
 
 /* Drop zone visual feedback */

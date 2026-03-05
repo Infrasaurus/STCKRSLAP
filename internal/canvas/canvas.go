@@ -24,20 +24,15 @@ func New(width, height int) *Canvas {
 	}
 }
 
-func (c *Canvas) AddSticker(imageData []byte, width, height int) uint64 {
+func (c *Canvas) AddSticker(imageData []byte, width, height int, mimeType string) uint64 {
 	id := atomic.AddUint64(&c.nextID, 1)
 
 	s := &Sticker{
 		ID:        id,
 		Width:     width,
 		Height:    height,
-		PlacedAt:  time.Now(),
 		ImageData: imageData,
-		ScrapeMask: make([]byte, width*height),
-	}
-	// Initialize mask to fully opaque
-	for i := range s.ScrapeMask {
-		s.ScrapeMask[i] = 255
+		MimeType:  mimeType,
 	}
 
 	c.mu.Lock()
@@ -58,6 +53,8 @@ func (c *Canvas) PlaceSticker(id uint64, x, y int) error {
 
 	s.X = x
 	s.Y = y
+	s.Placed = true
+	s.PlacedAt = time.Now()
 	return nil
 }
 
@@ -104,7 +101,7 @@ type StickerState struct {
 	Finalized bool     `json:"finalized"`
 	PlacedAt  string   `json:"placedAt"`
 	ImageData string   `json:"imageData"`
-	ScrapeMask []RLERun `json:"scrapeMask,omitempty"`
+	MimeType  string   `json:"mimeType"`
 }
 
 // CanvasState is the full state snapshot sent to new clients.
@@ -121,6 +118,9 @@ func (c *Canvas) Snapshot() CanvasState {
 	}
 
 	for _, s := range c.Stickers {
+		if !s.Placed {
+			continue
+		}
 		ss := StickerState{
 			ID:        s.ID,
 			X:         s.X,
@@ -131,20 +131,7 @@ func (c *Canvas) Snapshot() CanvasState {
 			Finalized: s.Finalized,
 			PlacedAt:  s.PlacedAt.Format(time.RFC3339),
 			ImageData: base64.StdEncoding.EncodeToString(s.ImageData),
-		}
-
-		// Only include scrape mask if sticker has been scraped
-		if s.ScrapeMask != nil {
-			allFull := true
-			for _, v := range s.ScrapeMask {
-				if v != 255 {
-					allFull = false
-					break
-				}
-			}
-			if !allFull {
-				ss.ScrapeMask = EncodeRLE(s.ScrapeMask)
-			}
+			MimeType:  s.MimeType,
 		}
 
 		state.Stickers = append(state.Stickers, ss)

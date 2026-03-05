@@ -9,22 +9,18 @@ import (
 	"time"
 
 	"nhooyr.io/websocket"
-
-	"github.com/infrasaurus/stckrslap/internal/canvas"
 )
 
 const (
 	writeTimeout   = 30 * time.Second
 	readLimit      = 64 * 1024 // 64KB max message size
 	sendBufSize    = 64
-	scrapeCooldown = 60 * time.Second
 )
 
 type Client struct {
 	hub          *Hub
 	conn         *websocket.Conn
 	send         chan []byte
-	lastScrapeAt time.Time
 }
 
 func HandleWS(hub *Hub) http.HandlerFunc {
@@ -102,8 +98,6 @@ func (c *Client) handleMessage(msg IncomingMessage) {
 		c.handlePlace(msg.Raw)
 	case MsgFinalize:
 		c.handleFinalize(msg.Raw)
-	case MsgScrape:
-		c.handleScrape(msg.Raw)
 	default:
 		c.sendError("unknown message type: " + msg.Type)
 	}
@@ -131,17 +125,8 @@ func (c *Client) handlePlace(raw json.RawMessage) {
 	// Refresh sticker state after placement
 	s = cv.GetSticker(msg.ID)
 
-	// Schedule auto-finalize after 60 seconds
-	go func() {
-		time.Sleep(60 * time.Second)
-		if err := cv.FinalizeSticker(msg.ID, 0); err == nil {
-			c.hub.Broadcast(StickerFinalizedMessage{
-				Type:     MsgStickerFinalized,
-				ID:       msg.ID,
-				Rotation: 0,
-			})
-		}
-	}()
+	// Update last-sticker timestamp and broadcast status
+	c.hub.SetLastStickerAt(s.PlacedAt)
 
 	// Broadcast to all clients
 	c.hub.Broadcast(StickerPlacedMessage{
@@ -152,8 +137,11 @@ func (c *Client) handlePlace(raw json.RawMessage) {
 		Width:     s.Width,
 		Height:    s.Height,
 		ImageData: base64.StdEncoding.EncodeToString(s.ImageData),
+		MimeType:  s.MimeType,
 		PlacedAt:  s.PlacedAt.Format(time.RFC3339),
 	})
+
+	c.hub.BroadcastStatus()
 }
 
 func (c *Client) handleFinalize(raw json.RawMessage) {
@@ -174,35 +162,6 @@ func (c *Client) handleFinalize(raw json.RawMessage) {
 		ID:       msg.ID,
 		Rotation: msg.Rotation,
 	})
-}
-
-func (c *Client) handleScrape(raw json.RawMessage) {
-	var msg ScrapeMessage
-	if err := json.Unmarshal(raw, &msg); err != nil {
-		c.sendError("invalid scrape message")
-		return
-	}
-
-	// Rate limit
-	if time.Since(c.lastScrapeAt) < scrapeCooldown {
-		c.sendError("scrape cooldown active")
-		return
-	}
-	c.lastScrapeAt = time.Now()
-
-	cv := c.hub.Canvas()
-	evt := canvas.ScrapeEvent{
-		Path:        msg.Path,
-		BrushRadius: msg.BrushRadius,
-	}
-
-	results := cv.ApplyScrape(evt)
-	if len(results) > 0 {
-		c.hub.Broadcast(ScrapeAppliedMessage{
-			Type:    MsgScrapeApplied,
-			Updates: results,
-		})
-	}
 }
 
 func (c *Client) sendError(message string) {

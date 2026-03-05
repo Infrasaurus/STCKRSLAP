@@ -18,10 +18,10 @@ func ParseConfig() Config {
 	cfg := Config{
 		Port:          10014,
 		InviteKey:     os.Getenv("INVITE_KEY"),
-		MaxFileSize:   10 * 1024 * 1024,
-		MaxStickerDim: 4096,
-		CanvasWidth:   5000,
-		CanvasHeight:  20000,
+		MaxFileSize:   5 * 1024 * 1024,
+		MaxStickerDim: 2048,
+		CanvasWidth:   20000,
+		CanvasHeight:  5000,
 	}
 
 	if p := os.Getenv("PORT"); p != "" {

@@ -4,16 +4,18 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/infrasaurus/stckrslap/internal/canvas"
 )
 
 type Hub struct {
-	canvas     *canvas.Canvas
-	mu         sync.RWMutex
-	clients    map[*Client]bool
-	register   chan *Client
-	unregister chan *Client
+	canvas        *canvas.Canvas
+	mu            sync.RWMutex
+	clients       map[*Client]bool
+	register      chan *Client
+	unregister    chan *Client
+	lastStickerAt time.Time
 }
 
 func NewHub(c *canvas.Canvas) *Hub {
@@ -32,7 +34,8 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
-			log.Printf("Client connected (%d total)", h.clientCount())
+			log.Printf("Client connected (%d total)", h.ClientCount())
+			h.BroadcastStatus()
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -41,15 +44,36 @@ func (h *Hub) Run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
-			log.Printf("Client disconnected (%d total)", h.clientCount())
+			log.Printf("Client disconnected (%d total)", h.ClientCount())
+			h.BroadcastStatus()
 		}
 	}
 }
 
-func (h *Hub) clientCount() int {
+func (h *Hub) ClientCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
+}
+
+func (h *Hub) BroadcastStatus() {
+	msg := StatusMessage{
+		Type:      MsgStatus,
+		Connected: h.ClientCount(),
+	}
+	h.mu.RLock()
+	lastAt := h.lastStickerAt
+	h.mu.RUnlock()
+	if !lastAt.IsZero() {
+		msg.LastStickerAt = lastAt.Format(time.RFC3339)
+	}
+	h.Broadcast(msg)
+}
+
+func (h *Hub) SetLastStickerAt(t time.Time) {
+	h.mu.Lock()
+	h.lastStickerAt = t
+	h.mu.Unlock()
 }
 
 func (h *Hub) Broadcast(msg interface{}) {

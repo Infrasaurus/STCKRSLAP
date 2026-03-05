@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
@@ -17,7 +18,7 @@ func decodeImage(data []byte) (image.Image, string, error) {
 	contentType := http.DetectContentType(data)
 
 	switch contentType {
-	case "image/png", "image/jpeg", "image/webp":
+	case "image/png", "image/jpeg", "image/webp", "image/gif":
 		// OK
 	default:
 		return nil, "", fmt.Errorf("unsupported image format: %s", contentType)
@@ -34,6 +35,27 @@ func decodeImage(data []byte) (image.Image, string, error) {
 	}
 
 	return img, format, nil
+}
+
+// validateGIFDimensions checks that the GIF dimensions are within limits.
+// Unlike static images, GIFs cannot be resized so we reject if too large.
+func validateGIFDimensions(width, height, maxDim, canvasW, canvasH int) error {
+	threshW := float64(canvasW) * 0.33
+	threshH := float64(canvasH) * 0.33
+
+	if float64(width) > threshW {
+		return fmt.Errorf("animated GIF is too wide (%dpx, max %dpx) — GIFs cannot be resized", width, int(threshW))
+	}
+	if float64(height) > threshH {
+		return fmt.Errorf("animated GIF is too tall (%dpx, max %dpx) — GIFs cannot be resized", height, int(threshH))
+	}
+	if width > maxDim {
+		return fmt.Errorf("animated GIF is too wide (%dpx, max %dpx) — GIFs cannot be resized", width, maxDim)
+	}
+	if height > maxDim {
+		return fmt.Errorf("animated GIF is too tall (%dpx, max %dpx) — GIFs cannot be resized", height, maxDim)
+	}
+	return nil
 }
 
 // resizeIfNeeded downscales the image if it exceeds 33% of either canvas

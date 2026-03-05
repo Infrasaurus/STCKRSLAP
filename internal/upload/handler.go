@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/png"
 	"io"
@@ -18,6 +19,7 @@ type UploadResponse struct {
 	Width     int    `json:"width"`
 	Height    int    `json:"height"`
 	ImageData string `json:"imageData"`
+	MimeType  string `json:"mimeType"`
 	Resized   bool   `json:"resized,omitempty"`
 }
 
@@ -51,7 +53,44 @@ func Handler(cv *canvas.Canvas, maxDim, canvasW, canvasH int, maxFileSize int64)
 			return
 		}
 
-		// Decode and validate format
+		// Detect content type for format-specific handling
+		contentType := http.DetectContentType(data)
+
+		// Animated GIFs: no resizing — validate and store raw bytes
+		if contentType == "image/gif" {
+			img, _, err := decodeImage(data)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			bounds := img.Bounds()
+			if err := validateGIFDimensions(bounds.Dx(), bounds.Dy(), maxDim, canvasW, canvasH); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if int64(len(data)) > maxFileSize {
+				sizeMB := float64(maxFileSize) / (1024 * 1024)
+				http.Error(w, fmt.Sprintf("animated GIF exceeds %.0fMB size limit — GIFs cannot be resized", sizeMB), http.StatusBadRequest)
+				return
+			}
+
+			id := cv.AddSticker(data, bounds.Dx(), bounds.Dy(), "image/gif")
+
+			resp := UploadResponse{
+				ID:        id,
+				Width:     bounds.Dx(),
+				Height:    bounds.Dy(),
+				ImageData: base64.StdEncoding.EncodeToString(data),
+				MimeType:  "image/gif",
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		// Static images: decode, resize if needed, encode to PNG
 		img, _, err := decodeImage(data)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -72,13 +111,14 @@ func Handler(cv *canvas.Canvas, maxDim, canvasW, canvasH int, maxFileSize int64)
 		}
 
 		bounds := img.Bounds()
-		id := cv.AddSticker(pngData, bounds.Dx(), bounds.Dy())
+		id := cv.AddSticker(pngData, bounds.Dx(), bounds.Dy(), "image/png")
 
 		resp := UploadResponse{
 			ID:        id,
 			Width:     bounds.Dx(),
 			Height:    bounds.Dy(),
 			ImageData: base64.StdEncoding.EncodeToString(pngData),
+			MimeType:  "image/png",
 			Resized:   resized,
 		}
 

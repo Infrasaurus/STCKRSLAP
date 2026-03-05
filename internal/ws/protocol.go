@@ -2,23 +2,20 @@ package ws
 
 import (
 	"encoding/json"
-
-	"github.com/infrasaurus/stckrslap/internal/canvas"
 )
 
 // Incoming message types
 const (
 	MsgPlace    = "place"
 	MsgFinalize = "finalize"
-	MsgScrape   = "scrape"
 )
 
 // Outgoing message types
 const (
 	MsgStickerPlaced    = "sticker_placed"
 	MsgStickerFinalized = "sticker_finalized"
-	MsgScrapeApplied    = "scrape_applied"
 	MsgFullState        = "full_state"
+	MsgStatus           = "status"
 	MsgError            = "error"
 )
 
@@ -57,13 +54,6 @@ type FinalizeMessage struct {
 	Rotation float64 `json:"rotation"`
 }
 
-// ScrapeMessage is sent when a client performs a scrape interaction.
-type ScrapeMessage struct {
-	Type        string               `json:"type"`
-	Path        []canvas.ScrapePoint `json:"path"`
-	BrushRadius int                  `json:"brushRadius"`
-}
-
 // OutgoingMessage is a generic outgoing message.
 type OutgoingMessage struct {
 	Type string `json:"type"`
@@ -78,6 +68,7 @@ type StickerPlacedMessage struct {
 	Width     int    `json:"width"`
 	Height    int    `json:"height"`
 	ImageData string `json:"imageData"`
+	MimeType  string `json:"mimeType"`
 	PlacedAt  string `json:"placedAt"`
 }
 
@@ -88,10 +79,11 @@ type StickerFinalizedMessage struct {
 	Rotation float64 `json:"rotation"`
 }
 
-// ScrapeAppliedMessage is broadcast when scrape results are computed.
-type ScrapeAppliedMessage struct {
-	Type    string                `json:"type"`
-	Updates []canvas.ScrapeResult `json:"updates"`
+// StatusMessage is broadcast when connection count or last-sticker time changes.
+type StatusMessage struct {
+	Type          string `json:"type"`
+	Connected     int    `json:"connected"`
+	LastStickerAt string `json:"lastStickerAt,omitempty"`
 }
 
 // ErrorMessage is sent to a single client on validation error.

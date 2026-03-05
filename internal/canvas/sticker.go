@@ -13,9 +13,10 @@ type Sticker struct {
 	Height     int       `json:"height"`
 	Rotation   float64   `json:"rotation"`
 	Finalized  bool      `json:"finalized"`
+	Placed     bool      `json:"placed"`
 	PlacedAt   time.Time `json:"placedAt"`
 	ImageData  []byte    `json:"-"`
-	ScrapeMask []byte    `json:"-"`
+	MimeType   string    `json:"-"`
 }
 
 // WorldToLocal transforms world coordinates into sticker-local coordinates,
@@ -49,32 +50,3 @@ func (s *Sticker) ContainsWorld(wx, wy float64) bool {
 	return lx >= 0 && lx < s.Width && ly >= 0 && ly < s.Height
 }
 
-// RLERun represents a run-length encoded segment.
-type RLERun struct {
-	Value byte   `json:"value"`
-	Count uint32 `json:"count"`
-}
-
-// EncodeRLE encodes a byte slice as run-length encoded data.
-func EncodeRLE(data []byte) []RLERun {
-	if len(data) == 0 {
-		return nil
-	}
-
-	runs := []RLERun{}
-	current := data[0]
-	count := uint32(1)
-
-	for i := 1; i < len(data); i++ {
-		if data[i] == current && count < math.MaxUint32 {
-			count++
-		} else {
-			runs = append(runs, RLERun{Value: current, Count: count})
-			current = data[i]
-			count = 1
-		}
-	}
-	runs = append(runs, RLERun{Value: current, Count: count})
-
-	return runs
-}

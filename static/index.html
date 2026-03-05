@@ -8,23 +8,25 @@
 </head>
 <body>
     <canvas id="canvas"></canvas>
+    <div id="gif-overlay"></div>
 
-    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
+    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+
+    <div id="sticker-tray"></div>
 
     <div id="hud">
         <div id="connection-status">Connecting...</div>
-        <div id="scrape-cooldown" hidden></div>
+        <div id="last-sticker"></div>
     </div>
 
     <div id="toolbar">
-        <button id="scrape-toggle" title="Toggle scrape mode (S)">Scrape</button>
+        <button id="upload-btn" title="Upload sticker">+ Sticker</button>
     </div>
 
     <script src="/static/js/input.js"></script>
     <script src="/static/js/canvas.js"></script>
     <script src="/static/js/websocket.js"></script>
     <script src="/static/js/sticker.js"></script>
-    <script src="/static/js/scrape.js"></script>
     <script src="/static/js/main.js"></script>
 </body>
 </html>
