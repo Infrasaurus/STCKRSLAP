@@ -18,7 +18,7 @@ STCKRSLAP is also offered in source code format with a `dockerfile`.  Simply clo
 
 When hosting STCKRSLAP, note that **HTTPS is not offered**, and the service runs over port [10014](https://en.wikipedia.org/wiki/Stonewall_Inn).  This shouldn't be a problem since it collects no logs and stores no data, but security-minded folks will want to use some sort of proxy or load balancer if you want HTTPS.
 
-Want the instance to be a little more private? You can define a unique string to join in the `{INVITE_KEY}` environment variable; append this to the end of the URL to join (e.g., `https://www.your.site/INVITE_KEY`).
+Want the instance to be a little more private? You can define a unique string to join in the `{INVITE_KEY}` environment variable; append this to the end of the URL to join (e.g., `http://www.your.site/INVITE_KEY`).
 
 ### This seems a little insecure...
 That's by design.  This is meant to be ephemeral, fleeting, anonymous, open - all the good stuff, none of the bad.
