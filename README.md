@@ -20,7 +20,7 @@ When hosting STCKRSLAP, note that **HTTPS is not offered**, and the service runs
 
 Want the instance to be a little more private? You can define a unique string to join in the `{INVITE_KEY}` environment variable; append this to the end of the URL to join (e.g., `http://www.your.site/INVITE_KEY`).
 
-### This seems a little insecure...
+### _This seems a little insecure..._ 😨
 That's by design.  This is meant to be ephemeral, fleeting, anonymous, open - all the good stuff, none of the bad.
 
 If you're thinking of using this in any sort of production capacity: **don't.**
