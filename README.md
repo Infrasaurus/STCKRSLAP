@@ -31,6 +31,4 @@ Why would you want to? The beauty of slapping stickers is you never know how lon
 That said, nothing's stopping you from capturing screenshots of your artwork.  If you're proud of your work, snap away!
 
 ## Can I sell this in some form?
-**No, you absolutely cannot!** This project was provided to the world gratis, but on the sole condition that you cannot sell this project in any form (even selling it as a hosted app service, a la AWS or Digital Ocean) without consulting me first.
-
-If you wanna modify its code? Go for it! Same license applies, though (no commercial use without consulting me first).  Wanna host it on Hetzner for your friends out of your own pocket? Sure thing!  Want to turn it into a hosted service you charge others for? **Fuck you, pay me!**
+**No, you absolutely cannot!** The code to this project is MIT-licensed as it's from an LLM, but the core concept remains mine.  Feel free to run this for your friends, but commercialization is prohibited.
