@@ -1,12 +1,20 @@
-FROM golang:latest AS builder
+FROM --platform=$BUILDPLATFORM golang:latest AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o stckrslap .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o stckrslap .
 
 FROM alpine:3.20
+
+LABEL org.opencontainers.image.title="stckrslap" \
+      org.opencontainers.image.description="Virtual lamp pole sticker-slapping web app" \
+      org.opencontainers.image.platforms="linux/amd64,linux/arm64"
+
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /app/stckrslap .
