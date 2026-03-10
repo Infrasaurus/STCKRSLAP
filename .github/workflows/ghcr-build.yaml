@@ -30,12 +30,25 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.BUILD }}
+      # Creates version tag using some regex.
+      - name: Generate version
+        id: version
+        # Props to https://regex101.com for helping me with this. RegEx is not my forte.
+        run: |
+          LATEST=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          MINOR=$(echo "$LATEST" | sed 's/^v[0-9]*\.//')
+          MAJOR=$(echo "$LATEST" | sed 's/^v\([0-9]*\)\..*/\1/')
+          NEXT="v${MAJOR}.$((MINOR + 1))"
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
       # This step uses [docker/metadata-action](https://github.com/docker/metadata-action#about) to extract tags and labels that will be applied to the specified image. The `id` "meta" allows the output of this step to be referenced in a subsequent step. The `images` value provides the base name for the tags and labels.
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.version.outputs.tag }}
       # This step uses the `docker/build-push-action` action to build the image, based on your repository's `Dockerfile`. If the build succeeds, it pushes the image to GitHub Packages.
       # It uses the `context` parameter to define the build's context as the set of files located in the specified path. For more information, see [Usage](https://github.com/docker/build-push-action#usage) in the README of the `docker/build-push-action` repository.
       # It uses the `tags` and `labels` parameters to tag and label the image with the output from the "meta" step.
@@ -60,5 +73,26 @@ jobs:
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
-      
+          # push-to-registry: true ## COMMENTING OUT: Podman does not pull the image; commenting out to remove Sigstore attestation from the OCI artifact
+      # Creates GitHub release using Softprops' "action-gh-release" action
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body: |
+            ## STCKRSLAP - ${{ steps.version.outputs.tag }}
+
+            **Docker** 🐳:
+            ```
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.tag }}
+            ```
+
+            **Podman** 🦦:
+            ```
+            podman pull ghcr.io/${{ github.repository}}:${{ steps.version.outputs.tag }}
+            ```
+
+            **Supported Platforms:** Linux (`amd64`,`arm64`)
+            **Digest:** `${{ steps.push.outputs.digest }}`
+          generate_release_notes: true
