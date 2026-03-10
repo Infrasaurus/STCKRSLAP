@@ -80,6 +80,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
+          token: ${{ secrets.RELEASE }}
           body: |
             ## STCKRSLAP - ${{ steps.version.outputs.tag }}
 
